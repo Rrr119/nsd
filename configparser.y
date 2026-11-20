@@ -202,6 +202,7 @@ cmpstringp(const void *p1, const void *p2)
 %token VAR_NOTIFY
 %token VAR_PROVIDE_XFR
 %token VAR_ALLOW_QUERY
+%token VAR_QUERY_DENY_ACTION
 %token VAR_AXFR
 %token VAR_UDP
 %token VAR_NOTIFY_RETRY
@@ -1152,6 +1153,16 @@ pattern_or_zone_option:
     {
       acl_options_type *acl = parse_acl_info(cfg_parser->opt->region, $2, $3);
       append_acl(&cfg_parser->pattern->allow_query, acl);
+    }
+  | VAR_QUERY_DENY_ACTION STRING
+    {
+      int action = query_deny_action_from_str($2);
+      if(action == -1)
+        yyerror("expected refuse, drop or nxdomain for query-deny-action");
+      else {
+        cfg_parser->pattern->query_deny_action = (uint8_t)action;
+        cfg_parser->pattern->query_deny_action_is_default = 0;
+      }
     }
   | VAR_OUTGOING_INTERFACE STRING
     {

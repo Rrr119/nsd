@@ -1,0 +1,4 @@
+default.example.	3600	IN	SOA	ns1.default.example. admin.default.example. 1 7200 3600 1209600 3600
+default.example.	3600	IN	NS	ns1.default.example.
+ns1.default.example.	3600	IN	A	127.0.0.1
+www.default.example.	3600	IN	A	192.0.2.1

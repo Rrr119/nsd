@@ -1115,6 +1115,29 @@ acl_list_equal(struct acl_options* p, struct acl_options* q)
 	return 0;
 }
 
+int
+query_deny_action_from_str(const char* str)
+{
+	if(strcmp(str, "refuse") == 0)
+		return QUERY_DENY_ACTION_REFUSE;
+	if(strcmp(str, "drop") == 0)
+		return QUERY_DENY_ACTION_DROP;
+	if(strcmp(str, "nxdomain") == 0)
+		return QUERY_DENY_ACTION_NXDOMAIN;
+	return -1;
+}
+
+const char*
+query_deny_action_to_str(int action)
+{
+	switch(action) {
+	case QUERY_DENY_ACTION_DROP: return "drop";
+	case QUERY_DENY_ACTION_NXDOMAIN: return "nxdomain";
+	case QUERY_DENY_ACTION_REFUSE:
+	default: return "refuse";
+	}
+}
+
 struct pattern_options*
 pattern_options_create(region_type* region)
 {
@@ -1131,6 +1154,8 @@ pattern_options_create(region_type* region)
 	p->notify = 0;
 	p->provide_xfr = 0;
 	p->allow_query = 0;
+	p->query_deny_action = QUERY_DENY_ACTION_REFUSE;
+	p->query_deny_action_is_default = 1;
 	p->outgoing_interface = 0;
 	p->notify_retry = 5;
 	p->notify_retry_is_default = 1;
@@ -1370,6 +1395,8 @@ copy_pat_fixed(region_type* region, struct pattern_options* orig,
 	orig->notify_retry = p->notify_retry;
 	orig->notify_retry_is_default = p->notify_retry_is_default;
 	orig->implicit = p->implicit;
+	orig->query_deny_action = p->query_deny_action;
+	orig->query_deny_action_is_default = p->query_deny_action_is_default;
 	if(p->zonefile)
 		orig->zonefile = region_strdup(region, p->zonefile);
 	else orig->zonefile = NULL;
@@ -1537,6 +1564,9 @@ pattern_options_equal(struct pattern_options* p, struct pattern_options* q)
 	if(!acl_list_equal(p->notify, q->notify)) return 0;
 	if(!acl_list_equal(p->provide_xfr, q->provide_xfr)) return 0;
 	if(!acl_list_equal(p->allow_query, q->allow_query)) return 0;
+	if(p->query_deny_action != q->query_deny_action) return 0;
+	if(!booleq(p->query_deny_action_is_default,
+		q->query_deny_action_is_default)) return 0;
 	if(!acl_list_equal(p->outgoing_interface, q->outgoing_interface))
 		return 0;
 	if(p->max_refresh_time != q->max_refresh_time) return 0;
@@ -1864,6 +1894,8 @@ pattern_options_marshal(struct buffer* b, struct pattern_options* p)
 	marshal_acl_list(b, p->notify);
 	marshal_acl_list(b, p->provide_xfr);
 	marshal_acl_list(b, p->allow_query);
+	marshal_u8(b, p->query_deny_action);
+	marshal_u8(b, p->query_deny_action_is_default);
 	marshal_acl_list(b, p->outgoing_interface);
 	marshal_u32(b, p->max_refresh_time);
 	marshal_u8(b, p->max_refresh_time_is_default);
@@ -1920,6 +1952,8 @@ pattern_options_unmarshal(region_type* r, struct buffer* b)
 	p->notify = unmarshal_acl_list(r, b);
 	p->provide_xfr = unmarshal_acl_list(r, b);
 	p->allow_query = unmarshal_acl_list(r, b);
+	p->query_deny_action = unmarshal_u8(b);
+	p->query_deny_action_is_default = unmarshal_u8(b);
 	p->outgoing_interface = unmarshal_acl_list(r, b);
 	p->max_refresh_time = unmarshal_u32(b);
 	p->max_refresh_time_is_default = unmarshal_u8(b);
@@ -3096,6 +3130,10 @@ config_apply_pattern(struct pattern_options *dest, const char* name)
 	copy_and_append_acls(&dest->notify, pat->notify);
 	copy_and_append_acls(&dest->provide_xfr, pat->provide_xfr);
 	copy_and_append_acls(&dest->allow_query, pat->allow_query);
+	if(!pat->query_deny_action_is_default) {
+		dest->query_deny_action = pat->query_deny_action;
+		dest->query_deny_action_is_default = 0;
+	}
 	copy_and_append_acls(&dest->outgoing_interface, pat->outgoing_interface);
 	if(pat->multi_primary_check)
 		dest->multi_primary_check = pat->multi_primary_check;

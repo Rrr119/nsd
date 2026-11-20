@@ -1,0 +1,17 @@
+{
+  "root": "/home/dev/feedback/uid30811",
+  "B": "/home/dev/feedback/uid30811",
+  "sha": "d0af6056c2e5dad1418eb94feee2bd77d27e5190",
+  "wslDistro": "Ubuntu-26.04",
+  "source": {
+    "owner": "NLnetLabs",
+    "repo": "nsd",
+    "sha": "d0af6056c2e5dad1418eb94feee2bd77d27e5190"
+  },
+  "fork": {
+    "owner": "Rrr119",
+    "repo": "nsd",
+    "cloneUrl": "https://github.com/Rrr119/nsd.git"
+  },
+  "at": "2026-11-20T21:52:00.438Z"
+}

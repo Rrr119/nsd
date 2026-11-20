@@ -1,0 +1,87 @@
+# #-- query_deny_action.test --#
+# source the master var file when it's there
+[ -f ../.tpkg.var.master ] && source ../.tpkg.var.master
+# use .tpkg.var.test for in test variable passing
+[ -f .tpkg.var.test ] && source .tpkg.var.test
+
+DIG=dig
+FAILED=0
+
+check_status() { # <file> <expected-status> <description>
+	if ! grep -q ", status: $1, " $2; then
+		cat $2
+		echo "$3"
+		echo "FAILED"
+		FAILED=1
+	fi
+}
+
+# Test 1: allowed.example, allow-query: 127.0.0.0/8 NOKEY
+# Queries from localhost are allowed, SOA at the apex.
+$DIG @127.0.0.1 -p $TPKG_PORT SOA allowed.example +norec > t1.out
+check_status NOERROR t1.out "Test 1: allowed source SOA query allowed"
+
+# Test 2: allowed.example, allow-query: 127.0.0.0/8 NOKEY
+# Queries from localhost are allowed, A record below the apex.
+$DIG @127.0.0.1 -p $TPKG_PORT A www.allowed.example +norec > t2.out
+check_status NOERROR t2.out "Test 2: allowed source A query allowed"
+if ! grep -q "^www.allowed.example." t2.out; then
+	cat t2.out
+	echo "Test 2: expected answer for www.allowed.example"
+	echo "FAILED"
+	FAILED=1
+fi
+
+# Test 3: allowed.example over TCP is allowed too.
+$DIG @127.0.0.1 -p $TPKG_PORT +tcp SOA allowed.example +norec > t3.out
+check_status NOERROR t3.out "Test 3: allowed source SOA query over TCP allowed"
+
+# Test 4: default.example, allow-query without query-deny-action
+# keeps the default refuse policy for denied sources.
+$DIG @127.0.0.1 -p $TPKG_PORT SOA default.example +norec > t4.out
+check_status REFUSED t4.out "Test 4: default query-deny-action is refuse"
+
+# Test 5: refuse.example, query-deny-action: refuse
+# Denied source gets REFUSED for SOA.
+$DIG @127.0.0.1 -p $TPKG_PORT SOA refuse.example +norec > t5.out
+check_status REFUSED t5.out "Test 5: refuse policy SOA query refused"
+
+# Test 6: refuse.example, query-deny-action: refuse
+# Denied source gets REFUSED for A below the apex.
+$DIG @127.0.0.1 -p $TPKG_PORT A www.refuse.example +norec > t6.out
+check_status REFUSED t6.out "Test 6: refuse policy A query refused"
+
+# Test 7: drop.example, query-deny-action: drop
+# Denied UDP query is silently discarded, no response at all.
+$DIG @127.0.0.1 -p $TPKG_PORT +time=2 +tries=1 SOA drop.example +norec > t7.out
+if grep -q ", status: " t7.out; then
+	cat t7.out
+	echo "Test 7: drop policy UDP query must not be answered"
+	echo "FAILED"
+	FAILED=1
+fi
+
+# Test 8: drop.example, query-deny-action: drop
+# Denied TCP query gets no answer either.
+$DIG @127.0.0.1 -p $TPKG_PORT +tcp +time=2 +tries=1 SOA drop.example +norec > t8.out
+if grep -q ", status: " t8.out; then
+	cat t8.out
+	echo "Test 8: drop policy TCP query must not be answered"
+	echo "FAILED"
+	FAILED=1
+fi
+
+# Test 9: nxdomain.example, query-deny-action: nxdomain
+# Denied source gets NXDOMAIN, hiding the zone.
+$DIG @127.0.0.1 -p $TPKG_PORT SOA nxdomain.example +norec > t9.out
+check_status NXDOMAIN t9.out "Test 9: nxdomain policy SOA query answered NXDOMAIN"
+
+# Test 10: pattern.example, query-deny-action from include-pattern
+# The response policy works when set in an included pattern.
+$DIG @127.0.0.1 -p $TPKG_PORT A www.pattern.example +norec > t10.out
+check_status NXDOMAIN t10.out "Test 10: nxdomain policy from include-pattern"
+
+if [ $FAILED -ne 0 ]; then
+	exit 1
+fi
+exit 0

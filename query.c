@@ -267,6 +267,7 @@ query_reset(query_type *q, size_t maxlen, int is_tcp)
 	q->zone = NULL;
 	q->opcode = 0;
 	q->cname_count = 0;
+	q->deny_drop = 0;
 	q->delegation_domain = NULL;
 	q->delegation_rrset = NULL;
 	q->compressed_dname_count = 0;
@@ -1369,6 +1370,39 @@ answer_authoritative(struct nsd   *nsd,
 /*
  * qname may be different after CNAMEs have been followed from query->qname.
  */
+/*
+ * Apply the query-deny-action response policy for a query that is
+ * denied by the allow-query ACL of the zone.
+ */
+static void
+answer_query_denied(struct query *q)
+{
+	int action = QUERY_DENY_ACTION_REFUSE;
+	if(q->zone->opts && q->zone->opts->pattern)
+		action = q->zone->opts->pattern->query_deny_action;
+	switch(action) {
+	case QUERY_DENY_ACTION_DROP:
+		/* silently drop the query, no response is sent */
+		if(q->cname_count == 0)
+			q->deny_drop = 1;
+		break;
+	case QUERY_DENY_ACTION_NXDOMAIN:
+		/* hide the existence of the zone */
+		if(q->cname_count == 0)
+			RCODE_SET(q->packet, RCODE_NXDOMAIN);
+		break;
+	case QUERY_DENY_ACTION_REFUSE:
+	default:
+		if(q->cname_count == 0) {
+			RCODE_SET(q->packet, RCODE_REFUSE);
+			/* RFC8914 - Extended DNS Errors
+			 * 4.19. Extended DNS Error Code 18 - Prohibited */
+			q->edns.ede = EDE_PROHIBITED;
+		}
+		break;
+	}
+}
+
 static void
 answer_lookup_zone(struct nsd *nsd, struct query *q, answer_type *answer,
 	size_t domain_number, int exact, domain_type *closest_match,
@@ -1409,13 +1443,7 @@ answer_lookup_zone(struct nsd *nsd, struct query *q, answer_type *answer,
 					      : why->key_name )
 					    : "no acl matches")));
 			}
-			/* no zone for this */
-			if(q->cname_count == 0) {
-				RCODE_SET(q->packet, RCODE_REFUSE);
-				/* RFC8914 - Extended DNS Errors
-				 * 4.19. Extended DNS Error Code 18 - Prohibited */
-				q->edns.ede = EDE_PROHIBITED;
-			}
+			answer_query_denied(q);
 			return;
 		}
 		if(acl_check_incoming(
@@ -1452,13 +1480,7 @@ answer_lookup_zone(struct nsd *nsd, struct query *q, answer_type *answer,
 					(why&&why->ip_address_spec[0]?" ":""),
 					why?why->ip_address_spec:""));
 			}
-			/* no zone for this */
-			if(q->cname_count == 0) {
-				RCODE_SET(q->packet, RCODE_REFUSE);
-				/* RFC8914 - Extended DNS Errors
-				 * 4.19. Extended DNS Error Code 18 - Prohibited */
-				q->edns.ede = EDE_PROHIBITED;
-			}
+			answer_query_denied(q);
 			return;
 		}
 	}
@@ -1818,6 +1840,12 @@ query_process(query_type *q, nsd_type *nsd, uint32_t *now_p)
 	}
 
 	answer_query(nsd, q);
+
+	if(q->deny_drop) {
+		/* denied by allow-query ACL with query-deny-action: drop,
+		 * silently discard the query without sending a response */
+		return QUERY_DISCARDED;
+	}
 
 	return QUERY_PROCESSED;
 }

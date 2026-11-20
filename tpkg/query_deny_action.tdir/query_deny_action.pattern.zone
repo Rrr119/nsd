@@ -1,0 +1,4 @@
+pattern.example.	3600	IN	SOA	ns1.pattern.example. admin.pattern.example. 1 7200 3600 1209600 3600
+pattern.example.	3600	IN	NS	ns1.pattern.example.
+ns1.pattern.example.	3600	IN	A	127.0.0.1
+www.pattern.example.	3600	IN	A	192.0.2.1

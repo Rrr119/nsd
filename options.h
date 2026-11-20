@@ -306,6 +306,13 @@ struct cpu_map_option {
 /*
  * Pattern of zone options, used to contain options for zone(s).
  */
+/*
+ * Response policy for queries that are denied by the allow-query ACL.
+ */
+#define QUERY_DENY_ACTION_REFUSE   0 /* answer with REFUSED (default) */
+#define QUERY_DENY_ACTION_DROP     1 /* silently drop the query */
+#define QUERY_DENY_ACTION_NXDOMAIN 2 /* answer with NXDOMAIN */
+
 struct pattern_options {
 	rbnode_type node;
 	const char* pname; /* name of the pattern, key of rbtree */
@@ -315,6 +322,8 @@ struct pattern_options {
 	struct acl_options* notify;
 	struct acl_options* provide_xfr;
 	struct acl_options* allow_query;
+	uint8_t query_deny_action;
+	uint8_t query_deny_action_is_default;
 	struct acl_options* outgoing_interface;
 	const char* zonestats;
 #ifdef RATELIMIT
@@ -613,6 +622,10 @@ void key_options_tsig_add(struct nsd_options* opt);
 /* the reason why (the acl) is returned too (or NULL) */
 int acl_check_incoming(struct acl_options* acl, struct query* q,
 	struct acl_options** reason);
+/* return the query-deny-action value for the string, or -1 on error */
+int query_deny_action_from_str(const char* str);
+/* return string for the query-deny-action value */
+const char* query_deny_action_to_str(int action);
 int acl_addr_matches_host(struct acl_options* acl, struct acl_options* host);
 int acl_addr_matches(struct acl_options* acl, struct query* q);
 int acl_addr_matches_proxy(struct acl_options* acl, struct query* q);

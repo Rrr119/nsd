@@ -119,6 +119,12 @@ struct query {
 	 */
 	int cname_count;
 
+	/*
+	 * Set when the query is denied by the allow-query ACL and the
+	 * query-deny-action policy is to silently drop the query.
+	 */
+	int deny_drop;
+
 	/* Used for dname compression.  */
 	uint16_t     compressed_dname_count;
 	domain_type **compressed_dnames;

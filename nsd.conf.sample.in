@@ -484,6 +484,13 @@ remote-control:
 	# which is only offered for transfer to secondaries over TLS.
 	#allow-query: 192.0.2.0/24 NOKEY
 
+	# The query-deny-action sets the response policy for queries that
+	# are denied by the allow-query access control list. With refuse
+	# (the default) the query is answered with REFUSED, with drop the
+	# query is silently discarded and with nxdomain the query is
+	# answered with NXDOMAIN.
+	#query-deny-action: refuse
+
 	# If no primary and secondary access control elements are provided,
 	# this zone will not be served to/from other servers.
 
